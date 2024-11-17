@@ -1,0 +1,80 @@
+using PlutoUI
+using Plots, LaTeXStrings, DifferentialEquations
+default(size = 500 .* (√2, 1), dpi = 180, linewidth = 3, label = false)
+A = 0:0.1:2; # values between 0 and 2, with step 0.1
+
+# Defining the continuous-time system
+function assignment!(dx, x, p, t)
+    x1, x2 = x
+	α = p[1]
+    dx[1] = x1 * (1 - x1 - α * x2)   # f1(x)
+    dx[2] = x2 * (1 - α * x1 - x2)   # f2(x)
+end;
+
+# Re-defining the setup of the problem
+begin
+	p = [α]
+	
+	# defining the steady states (see pdf file for computation)
+	steady_states = [
+	[0, 0], 
+    [0, 1], 
+    [1, 0], 
+    [1/(1 + α), 1/(1 + α)]
+	]
+
+	# defining the initial states
+	h = 0.1 # constant h
+	initial_states = [
+    [h, 2 * h], 
+    [2 * h, h], 
+    [h, 2], 
+    [2, h], 
+    [2, 1], 
+    [1, 2]
+	] # list with the initial states
+	
+	# defining the time range
+	tspan = (0.0, 1000.0)
+end;
+# Computing and drawing the orbits in a phase diagram
+begin
+	# initializing the figure
+	fig_diag = plot(title="Phase diagram", xlabel="x_1", ylabel="x_2", xlims=(-0.25,2.25), ylims=(-0.25,2.25))
+	
+	# assigning a distinct color to each distinct orbit for clarity
+	num_orbits = length(initial_states)
+	color_palette = palette(:tab10, num_orbits)
+
+	# solving the problem for each initial state and plotting the orbit
+	# we employ a for loop for convenience
+	for (i,x0) in enumerate(initial_states)
+
+		#defining the problem
+		prob = ODEProblem(assignment!, x0, tspan, p)
+		alg = RK4() #choosing the Runge-Kutta 4th order method for the solver
+		sol = solve(prob, alg) #computing the numerical solution
+		
+		#plotting the orbit
+		plot!(sol, idxs=(1,2), label="Orbit $i", color=color_palette[i], lw=2)
+		
+		#marking the initial state on the graph
+		scatter!([sol[1,1]], [sol[2,1]], label="Initial state $i", color=color_palette[i], markersize=6, markershape=:diamond)
+		
+		#adding arrows to show directionality of the the orbit 
+		step = 2 #step parameters controls how often an arrow is shown
+		scale = 0.1 #scale parameter controls the scale of arrows
+		for j in 4:step:(length(sol)-1)
+			quiver!(
+				[sol[1,j]], [sol[2,j]], 
+				quiver=([scale*(sol[1,j+1] - sol[1,j])], [scale*(sol[2,j+1] - sol[2,j])]), 
+				color=color_palette[i], label="",lw=1.1)
+		end
+	end
+	# adding steady states to the graph
+	scatter!([ss[1] for ss in steady_states], [ss[2] for ss in steady_states], color=:red, markersize=8, label="Steady states")
+end;
+
+md"Pick a value for the parameter ``α =`` $(@bind α Slider(A, default = 0.5, show_value = true))"
+#showing the plot
+fig_diag
